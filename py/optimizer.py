@@ -34,6 +34,9 @@ class MOABC:
 
         #一回の強化費用
         self.price_grind = float(input_price_grind)
+        
+        #グラインダーの価格
+        self.price_grinder = 0
 
         #ハイパーパラメータ
         #   N:ループ数, M: 蜂の数
@@ -59,6 +62,22 @@ class MOABC:
         #archivesの初期化
         self.archives = []
 
+    
+    #使用する強化剤の設定
+    #   names_itemとnames_item_enoneを設定する
+    #   item_arrayは価値が低い順に入力
+    def update_items(self, item_type, item_array):
+        #item_typeの入力チェック
+        if item_type not in self.names_item.keys():
+            sys.exit('invailed item type %s. "booster" or "reducer" are available.' % item_type)
+        
+        #item_arrayにNoneがなければ追加
+        if item_array[0] != 'None':
+            item_array.insert(0, 'None')
+        
+        self.names_item[item_type] = item_array
+        self.names_item_enone[item_type] = self.names_item[item_type][1:]
+        
 
     #シミュレータを動かす関数(並列化用)
     def simulator(self, in_bee):
@@ -74,7 +93,7 @@ class MOABC:
             results = [sim_instance.grind_to10(reset=True) for x in range(self.num_average)]
             
             #各評価関数の適用
-            bee['fit']['count'] = fit_c.fit_count(results, self.price_grind)
+            bee['fit']['count'] = fit_c.fit_count(results, self.price_grind, self.price_grinder)
             bee['fit']['item'] = fit_i.fit_item(results, self.names_item_enone)
             
             return bee
