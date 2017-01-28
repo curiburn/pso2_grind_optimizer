@@ -7,6 +7,7 @@ import multiprocessing as mp
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ptick
+import progressbar
 
 import initialize as init
 import simulator as sim
@@ -22,7 +23,7 @@ class MOABC:
         self.infile_table = str(infile_prob_table)
 
         #並列化数
-        self.proc = 1
+        self.proc = 6
 
         #適用するアイテムの設定
         self.use_skip = "None"
@@ -41,7 +42,7 @@ class MOABC:
         #ハイパーパラメータ
         #   N:ループ数, M: 蜂の数
         self.N = 60
-        self.M_employed = 10
+        self.M_employed = 20
         self.M_onlooker = 20
 
         #蜂関係
@@ -86,8 +87,9 @@ class MOABC:
             
             #アイテムの適用タイミングを設定
             sim_instance = copy.deepcopy(self.dodo)
-            sim_instance.set_reducers(bee['sol']['reducer'])
-            sim_instance.set_boosters(bee['sol']['booster'])
+            sim_instance.set_reducers(bee['sol']['reducer'], do_update=False)
+            sim_instance.set_boosters(bee['sol']['booster'], do_update=False)
+            sim_instance.calc_exec_ptable()
             
             #結果をリストにまとめる
             results = [sim_instance.grind_to10(reset=True) for x in range(self.num_average)]
@@ -103,7 +105,11 @@ class MOABC:
     
     
     #メインループ
-    def learn(self):
+    def learn(self, out_dirname=''):
+        #プログレスバーの初期化
+        bar = progressbar.ProgressBar(redirect_stdout=True)
+        
+        
         #収穫蜂の初期化
         self.gen.calculate_weights()
         colony_employed = [\
@@ -112,6 +118,9 @@ class MOABC:
         ]
         
         for i in range(self.N):
+            #プログレスバーの更新
+            bar.update(i)
+            
             #収穫蜂のフェーズ
             sys.stderr.write("%d th employed phase...\n" % i)
             colony_employed = self._do_employed(colony_employed)
@@ -126,16 +135,25 @@ class MOABC:
             
             #収穫蜂と追従蜂からもっともQが高い蜂を選び、世代の最適解としてフェロモンを更新
             sys.stderr.write("%d th pheromone updating phase...\n" % i)
-            colony_all = colony_employed + colony_onlooker
-            self._update_grobal_optimum(colony_all)
+            #colony_all = colony_employed + colony_onlooker
+            #self._update_grobal_optimum(colony_all)
+            self._update_grobal_optimum(self.arc.get_archive())
             
             #現在のアーカイブを保存する
             self.archives.append(self.arc.get_archive())
+            
+            #進捗の保存
+            if out_dirname != '':
+                self.save_result(out_dirname, i)
 
     
     #結果の保存
     #   out_dirnameに得られた解のプロットと中身をcsvで保存
-    def save_result(self, out_dirname):
+    def save_result(self, out_dirname, prefix=''):
+        #prefixの処理
+        if prefix != '':
+            prefix = "%s-" % prefix
+        
         #archiveを取ってくる
         self.archived_bee = self.arc.get_archive()
         
@@ -148,7 +166,7 @@ class MOABC:
         data_df = pd.DataFrame(data, columns=columns)
         
         #CSVに出力
-        data_df.to_csv('%s/summary.csv' % out_dirname)
+        data_df.to_csv('%s/%ssummary.csv' % (out_dirname, prefix))
         
         #散布図の生成
         #   snsで生成したあとに、各データ番号のラベルをつける
@@ -162,7 +180,7 @@ class MOABC:
         plot.ax.xaxis.set_major_formatter(ptick.ScalarFormatter(useMathText=True))
             
         #散布図の出力
-        plt.savefig('%s/pareto_front.png' % out_dirname, dpi=600)
+        plt.savefig('%s/%spareto_front.png' % (out_dirname, prefix), dpi=600)
 
 
     def _apply_operated_colony(self, colony, colonies_operated):
@@ -198,6 +216,8 @@ class MOABC:
     
     #オペレータの適用
     def _apply_operator(self, colony, bee_type):
+        sys.stderr.write("operator is been applying (type %s)...\n" % bee_type)
+        
         #収穫蜂のオペレータ
         if bee_type == 'employed':
             tmp_colony_whole = copy.deepcopy(colony)
@@ -321,6 +341,6 @@ if __name__ == '__main__':
     #最適化の実行
     op = MOABC(infile_prob_table, int(input_price_grind))
     op.proc = int(input_proc)
-    op.learn()
+    op.learn(out_dirname)
     op.save_result(out_dirname)
     
