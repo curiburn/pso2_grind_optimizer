@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import sys
 
+import flat
+
  
 class Bee:
     def __init__(self, infile_prob_table, in_names_item):
@@ -19,8 +21,11 @@ class Bee:
         #フェロモンの初期化
         self.update_pheromone()
         
-        #フェロモンの付与
-        self.d_pheromone = 1
+        #付与されるフェロモン量
+        self.d_pheromone = 1.0
+        
+        #フェロモンの蒸発率
+        self.roh = 0.1
         
         #ヒューリスティクスとフェロモンの重み
         self._weight_h = 1
@@ -47,6 +52,7 @@ class Bee:
         #重みの計算
         self.weights_booster = (self.heuristics["booster"] ** self._weight_h) * self.pheromones["booster"]
         self.weights_reducer = (self.heuristics["reducer"] ** self._weight_h) * self.pheromones["reducer"]
+        self.weights_flat = (1.0 ** self._weight_h) * self.pheromones["flat"]
         
         #重みの正規化(行方向)
         for i in range(self.grind_length):
@@ -55,6 +61,9 @@ class Bee:
                 self.weights_booster.iloc[i] /= sum(self.weights_booster.iloc[i])
             if sum(self.weights_reducer.iloc[i]) != 0:
                 self.weights_reducer.iloc[i] /= sum(self.weights_reducer.iloc[i])
+        
+        #重みの正規化(flat)
+        self.weights_flat["value"] /= sum(self.weights_flat["value"])
         
         #フラグを立てる
         self.is_weight_calculated = True
@@ -73,10 +82,19 @@ class Bee:
         else:
             sol_booster = [self.names_booster[np.argmax(self.weights_booster.iloc[i].values)] for i in range(self.grind_length)]
             sol_reducer = [self.names_reducer[np.argmax(self.weights_reducer.iloc[i].values)] for i in range(self.grind_length)]
+        sol_obj = {"booster": sol_booster, "reducer": sol_reducer, "flat_init": False}
+        
+        #flatの処理
+        is_do_flatted = np.random.choice(self.weights_flat.index, p=self.weights_flat["value"]) == "True"
+        print(is_do_flatted)
+        if is_do_flatted:
+            sol_obj["booster"] = flat.flatten_sol(sol_obj, "booster", list(self.pheromones["booster"].columns))
+            sol_obj["reducer"] = flat.flatten_sol(sol_obj, "reducer", list(self.pheromones["reducer"].columns))
+            sol_obj["flat_init"] = True
         
         #返す
-        return {"booster": sol_booster, "reducer": sol_reducer}
-        
+        return sol_obj
+
     
     def init_heuristics(self):
         heuristics_booster = []
@@ -116,20 +134,29 @@ class Bee:
             #1で埋める
             pheromones_booster = pd.DataFrame(np.ones((self.grind_length, len(self.names_booster))), columns=self.names_booster)
             pheromones_reducer = pd.DataFrame(np.ones((self.grind_length, len(self.names_reducer))), columns=self.names_reducer)
+            pheromones_flat = pd.DataFrame(np.ones(2), index=['True', 'False'], columns=['value'])
             
             #データ構造整理して突っ込む
-            self.pheromones = {"booster": pheromones_booster, "reducer": pheromones_reducer}
+            self.pheromones = {"booster": pheromones_booster, "reducer": pheromones_reducer, "flat": pheromones_flat}
         
         #フェロモンの更新
         else:
-            #解を取ってくる
+            #最適解の取得
             boosters_best = bee_best["sol"]["booster"]
             reducers_best = bee_best["sol"]["reducer"]
+            is_flat = \
+                flat.is_flattened_sol(bee_best["sol"], "booster", list(self.pheromones["booster"].columns)) and \
+                flat.is_flattened_sol(bee_best["sol"], "reducer", list(self.pheromones["reducer"].columns))
             
-            #解に該当するところにフェロモンを付与
+            #フェロモンの蒸発
+            for key in self.pheromones.keys():
+                self.pheromones[key] *= self.roh
+            
+            #フェロモンの付与
             for i in range(self.grind_length):
-                self.pheromones["booster"].iloc[i][boosters_best[i]] += self.d_pheromone
-                self.pheromones["reducer"].iloc[i][reducers_best[i]] += self.d_pheromone
+                self.pheromones["booster"].loc[i][boosters_best[i]] += bee_best['Q']
+                self.pheromones["reducer"].loc[i][reducers_best[i]] += bee_best['Q']
+            self.pheromones["flat"].loc[str(is_flat)] += bee_best['Q']
         
         #蜂の初期化の重みフラグをおる
         self.is_weight_calculated = False

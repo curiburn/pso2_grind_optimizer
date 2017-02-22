@@ -2,6 +2,18 @@ import pandas as pd
 import numpy as np
 import copy
 
+import flat
+
+
+#変更の適用
+#   解を適用してfitをNoneにする
+def _apply_sol(bee, sol):
+    bee["sol"] = sol
+    bee["fit"] = {key: None for key in bee["fit"].keys()}
+    
+    return bee
+    
+
 #基本的な近傍探索
 #upgrade: 使う強化剤を一段回引き上げる
 #   level["None", "+1"]のように、安いの順に
@@ -17,8 +29,9 @@ def upgrade(in_bee, type_item, level_item):
     
     #蜂への変更の適用
     #   fitはすべてNoneにする
-    bee["sol"][type_item] = [level_item[x] for x in sol_upgraded]
-    bee["fit"] = {x: None for x in bee["fit"].keys()}
+    sol = bee["sol"]
+    sol[type_item] = [level_item[x] for x in sol_upgraded]
+    bee = _apply_sol(bee, sol)
     
     return bee
 
@@ -36,8 +49,9 @@ def downgrade(in_bee, type_item, level_item):
     
     #蜂への変更の適用
     #   fitはすべてNoneにする
-    bee["sol"][type_item] = [level_item[x] for x in sol_downgraded]
-    bee["fit"] = {x: None for x in bee["fit"].keys()}
+    sol = bee["sol"]
+    sol[type_item] = [level_item[x] for x in sol_downgraded]
+    bee = _apply_sol(bee, sol)
     
     return bee
 
@@ -47,26 +61,11 @@ def downgrade(in_bee, type_item, level_item):
 def flatten(in_bee, type_item, level_item):
     bee = copy.deepcopy(in_bee)
     
-    #強化剤のランクのリスト変換
-    sol = [level_item.index(x) for x in bee["sol"][type_item]]
-    
-    #平滑化の実行
-    idx_current_item = 0
-    sol_flattened = []
-    for s in sol:
-        if idx_current_item > s:
-            #ランクの低い強化剤を使っていたら上書き
-            sol_flattened.append(idx_current_item)
-            
-        else:
-            #ランクの高い強化剤を使っていたらidx_current_item
-            idx_current_item = s
-            sol_flattened.append(idx_current_item)
-    
     #蜂への変更の適用
     #   fitはすべてNoneにする
-    bee["sol"][type_item] = [level_item[x] for x in sol_flattened]
-    bee["fit"] = {x: None for x in bee["fit"].keys()}
+    sol = bee["sol"]
+    sol[type_item] = flat.flatten_sol(bee["sol"], type_item, level_item)
+    bee = _apply_sol(bee, sol)
     
     return bee
 
@@ -76,9 +75,8 @@ def flatten_both(in_bee, levels_item):
     bee = copy.deepcopy(in_bee)
     
     #各強化剤でflattenを実行
-    bee['sol'] = {item: flatten(bee, item, levels_item[item])['sol'][item] for item in levels_item.keys()}
+    sol = {item: flat.flatten_sol(bee["sol"], item, levels_item[item]) for item in levels_item.keys()}
     
-    #蜂のfitを消す
-    bee["fit"] = {x: None for x in bee["fit"].keys()}
+    bee = _apply_sol(bee, sol)
     
     return bee

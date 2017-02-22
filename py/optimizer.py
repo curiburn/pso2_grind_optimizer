@@ -3,10 +3,7 @@ import pandas as pd
 import sys
 import copy
 import gc
-import multiprocessing as mp
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ptick
+from sklearn.externals.joblib import Parallel, delayed
 import progressbar
 
 import initialize as init
@@ -107,7 +104,7 @@ class MOABC:
     #メインループ
     def learn(self, out_dirname=''):
         #プログレスバーの初期化
-        bar = progressbar.ProgressBar(redirect_stdout=True)
+        bar = progressbar.ProgressBar(redirect_stdout=True, max_value=self.N)
         
         
         #収穫蜂の初期化
@@ -149,7 +146,7 @@ class MOABC:
     
     #結果の保存
     #   out_dirnameに得られた解のプロットと中身をcsvで保存
-    def save_result(self, out_dirname, prefix=''):
+    def save_result(self, out_dirname, prefix='', with_image=True):
         #prefixの処理
         if prefix != '':
             prefix = "%s-" % prefix
@@ -168,19 +165,24 @@ class MOABC:
         #CSVに出力
         data_df.to_csv('%s/%ssummary.csv' % (out_dirname, prefix))
         
-        #散布図の生成
-        #   snsで生成したあとに、各データ番号のラベルをつける
-        plot = sns.lmplot('fit_item', 'fit_count', data_df, fit_reg=False)
-        for idx in data_df.index:
-            plot.ax.text(\
-                data_df.loc[idx, 'fit_item'], data_df.loc[idx, 'fit_count'], '%s' % idx\
-            )
-        plot.ax.ticklabel_format(style='sci',axis='both', scilimits=(1e4,-1e4))
-        plot.ax.yaxis.set_major_formatter(ptick.ScalarFormatter(useMathText=True))
-        plot.ax.xaxis.set_major_formatter(ptick.ScalarFormatter(useMathText=True))
+        if with_image:
+            import seaborn as sns
+            import matplotlib.pyplot as plt
+            import matplotlib.ticker as ptick
             
-        #散布図の出力
-        plt.savefig('%s/%spareto_front.png' % (out_dirname, prefix), dpi=600)
+            #散布図の生成
+            #   snsで生成したあとに、各データ番号のラベルをつける
+            plot = sns.lmplot('fit_item', 'fit_count', data_df, fit_reg=False)
+            for idx in data_df.index:
+                plot.ax.text(\
+                    data_df.loc[idx, 'fit_item'], data_df.loc[idx, 'fit_count'], '%s' % idx\
+                )
+            plot.ax.ticklabel_format(style='sci',axis='both', scilimits=(1e4,-1e4))
+            plot.ax.yaxis.set_major_formatter(ptick.ScalarFormatter(useMathText=True))
+            plot.ax.xaxis.set_major_formatter(ptick.ScalarFormatter(useMathText=True))
+                
+            #散布図の出力
+            plt.savefig('%s/%spareto_front.png' % (out_dirname, prefix), dpi=600)
 
 
     def _apply_operated_colony(self, colony, colonies_operated):
@@ -221,6 +223,10 @@ class MOABC:
         #収穫蜂のオペレータ
         if bee_type == 'employed':
             tmp_colony_whole = copy.deepcopy(colony)
+            tmp_colony_whole.extend([ns.upgrade(bee, "booster", self.names_item['booster']) for bee in colony])
+            tmp_colony_whole.extend([ns.downgrade(bee, "booster", self.names_item['booster']) for bee in colony])
+            tmp_colony_whole.extend([ns.upgrade(bee, "reducer", self.names_item['reducer']) for bee in colony])
+            tmp_colony_whole.extend([ns.downgrade(bee, "reducer", self.names_item['reducer']) for bee in colony])
             tmp_colony_whole.extend([ns.flatten_both(bee, self.names_item) for bee in colony])
                 
         #追従蜂のオペレータ
@@ -248,9 +254,7 @@ class MOABC:
         #全コロニーの適応値を計算
         #   シミュレータにかける
         #   各目的関数で結果をparse
-        p = mp.Pool(self.proc)
-        tmp_colony_whole = p.map(self.simulator, tmp_colony_whole)
-        p.close()
+        tmp_colony_whole = Parallel(n_jobs=self.proc)(delayed(self.simulator)(bee) for bee in tmp_colony_whole)
         
         #全コロニーを用いてself.archiveを更新
         #   Qが計算されたものが帰ってくる
@@ -289,9 +293,7 @@ class MOABC:
         #全コロニーの適応値を計算
         #   シミュレータにかける
         #   各目的関数で結果をparse
-        p = mp.Pool(self.proc)
-        tmp_colony_whole = p.map(self.simulator, tmp_colony_whole)
-        p.close()
+        tmp_colony_whole = Parallel(n_jobs=self.proc)(delayed(self.simulator)(bee) for bee in tmp_colony_whole)
         
         #全コロニーを用いてself.archiveを更新
         #   Qが計算されたものが帰ってくる
