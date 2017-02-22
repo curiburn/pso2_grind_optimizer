@@ -1,3 +1,4 @@
+#+10までに要した強化回数から費用を計算
 def fit_count(results, price_grind, price_grinder=0):
     num_grinds = [x["count_grind"] for x in results]
     num_grind = sum(num_grinds) * 1.0 / len(num_grinds)

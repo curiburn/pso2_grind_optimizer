@@ -26,12 +26,12 @@ _SKIPS = {
 }
 
 class Grind:
-    def __init__(self, infile_prob_table):
+    def __init__(self, infile_ptable):
         #強化関連の初期化
         self.reset()
         
         #強化成功テーブルの設定
-        self.set_prob_table(infile_prob_table)
+        self.set_ptable(infile_ptable)
         
         #使用する強化剤の初期化（セットは別のメソッドでやる）
         self.reducers = []
@@ -48,28 +48,81 @@ class Grind:
         self.consumed_skips = {x: 0 for x in _SKIPS.keys()}
         
     
-    def set_prob_table(self, infile_prob_table):
-        in_prob_table = pd.read_csv(infile_prob_table, header=0, index_col=0)
+    def set_ptable(self, infile_ptable):
+        in_ptable = pd.read_csv(infile_ptable, header=0, index_col=0)
         #行の和が100%になってるかチェック
-        for row in in_prob_table.values:
+        for row in in_ptable.values:
             if(sum(row) != 100):
                 sys.exit("sum is not 100")
-        self.prob_table = in_prob_table
+        self.ptable = in_ptable
+    
+    
+    def calc_exec_ptable(self):
+        #素の確率テーブルを読み込み
+        self.exec_ptable = self.ptable.copy()
+        
+        #各行に強化剤を適用
+        for i in self.exec_ptable.index:
+            #強化剤の設定
+            reducer = self.reducers[i]
+            booster = self.boosters[i]
             
+            #該当行の引き抜き
+            prob_row = self.exec_ptable.loc[i]
+            
+            #リスク軽減の適用
+            if reducer != "None":
+                if reducer == "Full":
+                    #リスク軽減(完全)の処理
+                    prob_row["Fail-0"] += sum(prob_row["Fail-1":])
+                    prob_row["Fail-1":] = 0
+                else:
+                    #軽減分だけ繰り返す
+                    for j in range(_REDUCERS[reducer]):
+                        #リスク軽減(+1)分の処理
+                        for k in range(len(prob_row)-1, 1, -1):
+                            if prob_row[k] != 0:
+                                prob_row[k-1] += prob_row[k]
+                                prob_row[k] = 0
+                                break
+                    
+            
+            #成功率アップの適用
+            if booster != "None":
+                prob_row["Success+1"] += _BOOSTERS[booster]
+                tmp_booster_effect = _BOOSTERS[booster]
+                for j in range(len(prob_row)-1, 0, -1):
+                    if prob_row[j] != 0:
+                        if prob_row[j] > tmp_booster_effect:
+                            prob_row[j] -= tmp_booster_effect
+                            tmp_booster_effect = 0
+                            break
+                        else:
+                            tmp_booster_effect -= prob_row[j]
+                            prob_row[j] = 0
+            
+            #編集した行の適用
+            self.exec_ptable.loc[i] = prob_row
     
     
-    def set_reducers(self, in_reducers):
-        if(len(in_reducers) != len(self.prob_table.index)):
+    def set_reducers(self, in_reducers, do_update=True):
+        if(len(in_reducers) != len(self.ptable.index)):
             sys.exit("length of reducer is not matched with probability table")
         else:
             self.reducers = in_reducers
+        
+        if do_update:
+            self.calc_exec_ptable()
     
     
-    def set_boosters(self, in_boosters):
-        if(len(in_boosters) != len(self.prob_table.index)):
+    def set_boosters(self, in_boosters, do_update=True):
+        if(len(in_boosters) != len(self.ptable.index)):
             sys.exit("length of booster is not matched with probability table")
         else:
             self.boosters = in_boosters
+        
+        if do_update:
+            self.calc_exec_ptable()
             
             
     def set_skip(self, in_skip):
@@ -78,6 +131,7 @@ class Grind:
         self.skip = in_skip
     
     def grind_once(self):
+        #強化剤の設定
         reducer = self.reducers[self.level_grinded]
         booster = self.boosters[self.level_grinded]
         
@@ -97,38 +151,7 @@ class Grind:
             return
         
         #現強化値の確率テーブルの取得
-        prob_row = self.prob_table.iloc[self.level_grinded].copy()
-        
-        #リスク軽減の適用
-        if reducer != "None":
-            if reducer == "Full":
-                #リスク軽減(完全)の処理
-                prob_row["Fail-0"] += sum(prob_row["Fail-1":])
-                prob_row["Fail-1":] = 0
-            else:
-                #軽減分だけ繰り返す
-                for i in range(_REDUCERS[reducer]):
-                    #リスク軽減(+1)分の処理
-                    for j in range(len(prob_row)-1, 1, -1):
-                        if prob_row[j] != 0:
-                            prob_row[j-1] += prob_row[j]
-                            prob_row[j] = 0
-                            break
-                
-        
-        #成功率アップの適用
-        if booster != "None":
-            prob_row["Success+1"] += _BOOSTERS[booster]
-            tmp_booster_effect = _BOOSTERS[booster]
-            for i in range(len(prob_row)-1, 0, -1):
-                if prob_row[i] != 0:
-                    if prob_row[i] > tmp_booster_effect:
-                        prob_row[i] -= tmp_booster_effect
-                        tmp_booster_effect = 0
-                        break
-                    else:
-                        tmp_booster_effect -= prob_row[i]
-                        prob_row[i] = 0
+        prob_row = self.exec_ptable.iloc[self.level_grinded]
         
         #強化結果
         prob_row /= prob_row.sum()
