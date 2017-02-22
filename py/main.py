@@ -33,7 +33,7 @@ parser.set_defaults(saveprogress=False)
 
 
 #並列化のプロセス数
-parser.add_argument("-np","--num_proc", type=str, default=1)
+parser.add_argument("-np","--num_proc", type=int, default=1)
 
 #画像出力の有無
 #   sshログインとかだと無理なので、Falseを入れる
