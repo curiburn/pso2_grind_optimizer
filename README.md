@@ -24,11 +24,26 @@ PSO2(Phantasy Star Online 2(C))の旧式武器及びユニットの強化の際�
 
 - numpy
 - pandas
+- sklearn
+- progressbar2
+- argparse
+
+画像の出力もしたい場合は追加に
+
 - matplotlib
 - seaborn
-- multiprocessing
+
+が必要です。
 
 ## 使い方
+###main.pyを使ったやり方
+```bash
+cd pso2_grind_simulator
+python3 ./py/main.py  ./data/weapon_13.csv ./test -pg 192000 -me 40 -mo 40 -n 100
+```
+オプションはwikiを参照
+
+###ipythonとかで実行するとき
 ```python
 #インポート
 #import sys
