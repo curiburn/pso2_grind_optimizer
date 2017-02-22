@@ -86,7 +86,6 @@ class Bee:
         
         #flatの処理
         is_do_flatted = np.random.choice(self.weights_flat.index, p=self.weights_flat["value"]) == "True"
-        print(is_do_flatted)
         if is_do_flatted:
             sol_obj["booster"] = flat.flatten_sol(sol_obj, "booster", list(self.pheromones["booster"].columns))
             sol_obj["reducer"] = flat.flatten_sol(sol_obj, "reducer", list(self.pheromones["reducer"].columns))
