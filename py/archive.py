@@ -27,7 +27,7 @@ class Archive:
     #支配の検査はしていない
     def _add_bee(self, bee):
         #解をそのままkeyにして重複を弾く
-        key = str(bee["sol"])
+        key = str(bee["sol"].values)
         
         if key not in self._archive.keys():
             self._archive.update({key: bee})
@@ -76,37 +76,36 @@ class Archive:
         return colony_archived
     
     
-    def is_dominating(self, dominator, dominatee, weak=False):
+    def is_dominating(self, dominator, dominatee, weak=True):
         if weak:
-            #弱いパレート支配
-            #   一つでも支配していればok
-            is_dominating = False
-            for obj in self.max_or_min:
-                if self.max_or_min[obj] == "min":
-                    if dominator["fit"][obj] < dominatee["fit"][obj]:
-                        is_dominating = True
-                        break
-                    
-                elif self.max_or_min[obj] == "max":
-                    if dominator["fit"][obj] > dominatee["fit"][obj]:
-                        is_dominating =  True
-                        break
+            #弱支配であれば、一つだけ(dominator)>(dominatee)で、他は(dominator)>=(dominatee)
+            dominated = False
+            for obj in dominator['fit'].keys():
+                #弱い意味でのパレート支配
+                #一つだけ満たせばいい条件(dominator)>(dominatee)
+                if \
+                    (self.max_or_min[obj] == 'max' and dominator['fit'][obj] > dominatee['fit'][obj]) or \
+                    (self.max_or_min[obj] == 'min' and dominator['fit'][obj] < dominatee['fit'][obj]):
+                    dominated = True
+                
+                #全てにおいて満たすべき条件(dominator)>=(dominatee)
+                if \
+                    (self.max_or_min[obj] == 'max' and dominator['fit'][obj] < dominatee['fit'][obj]) or \
+                    (self.max_or_min[obj] == 'min' and dominator['fit'][obj] > dominatee['fit'][obj]):
+                    dominated = False
+                    break
         else:
-            #強いパレート支配
-            #   すべて支配していないとダメ
-            is_dominating = True
-            for obj in self.max_or_min:
-                if self.max_or_min[obj] == "min":
-                    if dominator["fit"][obj] >= dominatee["fit"][obj]:
-                        is_dominating = False
-                        break
-                    
-                elif self.max_or_min[obj] == "max":
-                    if dominator["fit"][obj] <= dominatee["fit"][obj]:
-                        is_dominating =  False
-                        break
+            #パレート支配
+            #   ふつうの支配であれば、全てにおいて(dominator)>(dominatee)を満たす
+            dominated = True
+            for obj in dominator['fit'].keys():
+                if \
+                    (self.max_or_min[obj] == 'max' and dominator['fit'][obj] <= dominatee['fit'][obj]) or \
+                    (self.max_or_min[obj] == 'min' and dominator['fit'][obj] >= dominatee['fit'][obj]):
+                    dominated = False
+                    break
         
-        return is_dominating
+        return dominated
     
     
     def get_dominator(self, bee, weak=False):

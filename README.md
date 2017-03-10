@@ -26,9 +26,17 @@ PSO2(Phantasy Star Online 2(C))の旧式武器及びユニットの強化の際�
 - pandas
 - matplotlib
 - seaborn
-- multiprocessing
+- sklearn
+- progressbar2
 
 ## 使い方
+###main.pyを使った方法
+```bash
+mkdir result
+python3 py/main.py data/weapon_13.csv result -pg 192000 -np 6
+```
+
+###ipython等でインポートして使う方法
 ```python
 #インポート
 #import sys
@@ -44,7 +52,6 @@ op = optimizer.MOABC('data/weapon_13.csv', 192000)
 #	このプログラムはとっても重いので、並列化ができるならおすすめ
 #	実行するマシンのCPUのコア数なりスレッド数と合わせる
 op.proc = 6	#6スレッドで並列
-
 #学習の実行
 op.learn()
 
