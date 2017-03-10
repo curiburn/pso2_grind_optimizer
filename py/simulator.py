@@ -37,6 +37,10 @@ class Grind:
         self.reducers = []
         self.boosters = []
         self.skip = ""
+        
+        #報酬期間の設定
+        #   10%弱体化なら p_weaken = 10
+        self.p_weaken = 0
     
     
     def reset(self):
@@ -88,9 +92,13 @@ class Grind:
                     
             
             #成功率アップの適用
+            #   成功率上昇の適用
+            #   報酬期間の適用
+            tmp_booster_effect = self.p_weaken
             if booster != "None":
-                prob_row["Success+1"] += _BOOSTERS[booster]
-                tmp_booster_effect = _BOOSTERS[booster]
+                tmp_booster_effect += _BOOSTERS[booster]
+            if tmp_booster_effect != 0:
+                prob_row["Success+1"] += tmp_booster_effect
                 for j in range(len(prob_row)-1, 0, -1):
                     if prob_row[j] != 0:
                         if prob_row[j] > tmp_booster_effect:
@@ -100,6 +108,9 @@ class Grind:
                         else:
                             tmp_booster_effect -= prob_row[j]
                             prob_row[j] = 0
+            
+            #行の正規化
+            prob_row /= sum(prob_row)
             
             #編集した行の適用
             self.exec_ptable.loc[i] = prob_row
@@ -150,12 +161,11 @@ class Grind:
             self.log_level_grinded.append(self.level_grinded)
             return
         
-        #現強化値の確率テーブルの取得
-        prob_row = self.exec_ptable.iloc[self.level_grinded]
-        
         #強化結果
-        prob_row /= prob_row.sum()
-        result = np.random.choice(a=range(len(prob_row)), p=prob_row)
+        result = np.random.choice(\
+            a=range(len(self.exec_ptable.columns)), \
+            p=self.exec_ptable.loc[self.level_grinded]\
+        )
         if(result == 0):
             self.level_grinded += 1
         else:
@@ -165,8 +175,8 @@ class Grind:
     def grind_to10(self, reset=False):
         #スキップの適用
         if self.skip != "None":
-            self.consumed_skips[skip] += 1
-            self.level_grinded += _SKIPS[skip]
+            self.consumed_skips[self.skip] += 1
+            self.level_grinded += _SKIPS[self.skip]
             self.count_grind += 1
         
         #ハゲるループ
