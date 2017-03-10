@@ -27,7 +27,7 @@ class Archive:
     #支配の検査はしていない
     def _add_bee(self, bee):
         #解をそのままkeyにして重複を弾く
-        key = str(bee["sol"])
+        key = str(bee["sol"].values)
         
         if key not in self._archive.keys():
             self._archive.update({key: bee})
