@@ -30,13 +30,13 @@ PSO2(Phantasy Star Online 2(C))の旧式武器及びユニットの強化の際�
 - progressbar2
 
 ## 使い方
-###main.pyを使った方法
+### main.pyを使った方法
 ```bash
 mkdir result
 python3 py/main.py data/weapon_13.csv result -pg 192000 -np 6
 ```
 
-###ipython等でインポートして使う方法
+### ipython等でインポートして使う方法
 ```python
 #インポート
 #import sys
